@@ -1,0 +1,210 @@
+clear
+set verbose off
+#set datacols 6
+
+# Parameters
+string DIR_WORK = "/home/at/git/football_data"
+string URL = "https://raw.githubusercontent.com/martj42/international_results/master/results.csv"
+scalar LOAD_DATA_FROM_WEB = FALSE
+
+# Set the working directory
+set workdir "@DIR_WORK"
+
+/* Create some folder (works only on LINUX!)
+ ON WINDOWS & MacOS: PLEASE CREATE TWO FOLDERS:
+ 1) "data"
+ 2) "output"
+*/
+if $sysinfo.os == "linux"
+    shell mkdir -p data output
+endif
+
+# Install necessary package(s) automatically if needed
+pkg query calendar_utils --quiet
+if nelem($result) <= 1
+    pkg install calendar_utils
+endif
+pkg query multiplot --quiet
+if nelem($result) <= 1
+    pkg install multiplot
+endif
+
+include calendar_utils.gfn
+include multiplot.gfn
+
+
+
+if LOAD_DATA_FROM_WEB == TRUE
+    # Load the data from the web
+    open "@URL" --quiet --preserve
+
+    # FIXME: 'date' becomes index even though
+    # resulting dataset becomes cross-section
+    # No chance to retrieve the index as string-series!
+
+    string filename = "./data/data_raw.csv"
+    store "@filename"
+endif
+
+string filename = "./data/data_raw.csv"
+open "@filename" --preserve --quiet
+
+# TODO: remove later
+#smpl 1 500 --permanent
+
+# Create some calendar series
+series date = dates_to_iso8601(date_string, "%Y-%m-%d")
+print date_string date -o --range=1:5
+series year, month, day
+isoconv(date, &year, &month, &day)
+print date_string date year month day -o --range=1:5
+
+
+# Plot
+## Count the number of entries (and hence games) per year
+matrix gpy = aggregate(year, year)
+gpy = mreverse(gpy, TRUE)
+print gpy --range=1:5
+
+plot gpy
+        options fit=none
+        literal set xlabel "Year"
+        literal set ylabel "Number of games"
+end plot --output="./output/games_per_year.png"
+
+
+# Plot with factors
+series friendly = (tournament == "Friendly")
+print tournament friendly -o --range=1:5
+
+list by = year friendly
+matrix gpyf = aggregate(year, by)
+print gpyf --range=1:5
+
+# For plotting, re-arrange the column order:
+gpyf = gpyf[,{3, 1, 2}]
+
+plot gpyf
+       options fit=none dummy
+       literal set xlabel "Year"
+       literal set ylabel "Number of games"
+end plot --output="./output/games_per_year_factorized.png"
+
+
+# Plot number of unique tournaments per year
+function scalar myuniq (const series y)
+    /* Aggregation function: Compute the number of unique entries of 'y'
+    return: int, number of unique entries. */
+    return rows(values(y))
+end function
+
+# TODO: If the aggregate function is applied to a restricted dataset,
+# I get the msg. "restore_full_sample: dset is not peerset!" ?
+#smpl full
+smpl tournament != "Friendly" --restrict --replace
+matrix tpy = aggregate(tournament, year, myuniq)
+print tpy --range=1:1
+tpy = mreverse(tpy, TRUE)
+# TODO: col.labels get lost!
+print tpy --range=1:1
+tpy = tpy[,{1, 3}]
+print tpy --range=1:1
+
+plot tpy
+       options fit=loess dummy
+       literal set xlabel "Year"
+       literal set ylabel "Number of tournament"
+end plot --output="./output/number_of_tournament_per_year.png"
+
+
+# Plot the average number of teams
+smpl tournament != "Friendly" --restrict --replace
+# Construct a unique combined series
+series teams = home_team # * 1000 + away_team
+print teams -o --range=1:10
+
+list by = year tournament
+matrix tpypt = aggregate(teams, by, mean)
+#print tpypt --range=1:10
+tpypt = tpypt[,{4, 1}]
+#print tpypt --range=1:10
+
+plot tpypt
+       options fit=loess dummy
+       literal set xlabel "Year"
+       literal set ylabel "Average number of teams per tournament"
+end plot --output="./output/avg_number_of_teams per_tournament_per_year.png"
+
+
+
+# Plot goals per game
+smpl full
+series goals = home_score + away_score
+smpl tournament == "FIFA World Cup" --restrict
+
+matrix gpg = aggregate(goals, year, mean)
+gpg = gpg[,{3, 1}]
+print gpg -o --range=1:10
+plot gpg
+       options fit=loess dummy
+       literal set xlabel "Year"
+       literal set ylabel "Average goals per game"
+end plot --output="./output/avg_goals_per_game.png"
+
+
+# Plot frequency of goal differences
+smpl full
+series goaldiff = abs(home_score - away_score)
+matrix years = {1954; 1990}
+strings filenames = array(nelem(years))
+
+loop i=1..rows(years)
+    smpl year == years[i] && tournament == "FIFA World Cup" --restrict --replace
+
+    filenames[i] = sprintf("%s/plot$i.gp", $dotdir)
+    string fname = filenames[i]
+
+    freq goaldiff --plot="@fname" # TODO: WHY NOT? "@filenames[i]"
+    # TODO: Title cannot be set! What about labels?
+endloop
+multiplot(filenames, "./output/frequency_goal_difference.png")
+
+
+# Percentages of winning, loosing and tie
+smpl full
+series win = (home_score > away_score) ? 1 : 0
+series lose = (home_score < away_score) ? 2 : 0
+series tie = (win == 0 && lose == 0) ? 3 : 0
+
+strings score_labels = defarray("win", "lose", "tie")
+series home_result = win + lose + tie
+stringify(home_result, score_labels)
+
+smpl home_result home_score away_score --no-missing
+print home_result home_score away_score -o --range=1:5
+
+matrix m = aggregate(home_result, home_result)
+print m
+m[,2] = m[,2]./ $nobs       # compute relative frequencies
+rnameset(m, score_labels)
+
+print m
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
