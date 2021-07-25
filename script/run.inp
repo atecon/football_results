@@ -85,7 +85,7 @@ end plot --output="./output/games_per_year_factorized.png"
 
 
 # Plot number of unique tournaments per year
-function scalar myuniq (const series y)
+function scalar unique_entries (const series y)
     /* Aggregation function: Compute the number of unique entries of 'y'
     return: int, number of unique entries. */
     return rows(values(y))
@@ -95,7 +95,7 @@ end function
 # I get the msg. "restore_full_sample: dset is not peerset!" ?
 #smpl full
 smpl tournament != "Friendly" --restrict --replace
-matrix tpy = aggregate(tournament, year, myuniq)
+matrix tpy = aggregate(tournament, year, unique_entries)
 tpy = mreverse(tpy, TRUE)
 tpy = tpy[,{1, 3}]
 print tpy --range=1:10
@@ -107,24 +107,19 @@ plot tpy
 end plot --output="./output/number_of_tournament_per_year.png"
 
 
-# Plot the average number of teams
+/*
+# Plot the average number of teams per competition (not easy to realize)
 smpl tournament != "Friendly" --restrict --replace
-# Construct a unique combined series
-series teams = home_team # * 1000 + away_team
-print teams -o --range=1:10
-
+list Teams = home_team away_team
 list by = year tournament
-matrix tpypt = aggregate(teams, by, mean)
-#print tpypt --range=1:10
-tpypt = tpypt[,{4, 1}]
-#print tpypt --range=1:10
+matrix tpypt = aggregate(Teams, by)
 
 plot tpypt
        options fit=loess dummy
        literal set xlabel "Year"
        literal set ylabel "Average number of teams per tournament"
-end plot --output="./output/avg_number_of_teams per_tournament_per_year.png"
-
+end plot --output="./output/avg_number_of_teams_per_tournament_per_year.png"
+*/
 
 
 # Plot goals per game
