@@ -1,11 +1,11 @@
 clear
 set verbose off
-#set datacols 6
+# set datacols 6  # works only since gretl 2021c
 
 # Parameters
 string DIR_WORK = "/home/at/git/football_results"
 string URL = "https://raw.githubusercontent.com/martj42/international_results/master/results.csv"
-scalar LOAD_DATA_FROM_WEB = FALSE
+scalar LOAD_DATA_FROM_WEB = TRUE
 
 # Set the working directory
 set workdir "@DIR_WORK"
@@ -42,7 +42,6 @@ if LOAD_DATA_FROM_WEB == TRUE
 else
     open "./data/data_raw.csv" --preserve  --all-cols
 endif
-
 
 
 # Create some calendar series
